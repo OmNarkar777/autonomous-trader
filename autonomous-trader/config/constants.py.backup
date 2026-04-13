@@ -1,0 +1,656 @@
+"""
+config/constants.py
+===================
+Static constants used across the system:
+  - Market trading hours
+  - Market holidays (NSE + NYSE, 2025-2026)
+  - Default stock watchlists
+  - Market regime definitions
+  - Score thresholds
+
+These values do not change at runtime. All configurable values
+(e.g., watchlist override, risk limits) live in settings.py instead.
+"""
+
+from datetime import date, time
+from enum import Enum
+from typing import Dict, List, Set
+import pytz
+
+# ═══════════════════════════════════════════════════════════════
+# POSITION SIZING & RISK MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+# Risk per trade (% of total capital)
+POSITION_RISK_PCT = 0.02  # Risk 2% of capital per trade
+
+# Position sizing constraints
+MAX_POSITION_SIZE_PCT = 0.10  # Max 10% of capital in single position
+MIN_POSITION_SIZE_PCT = 0.01  # Min 1% of capital per position
+
+# Portfolio constraints  
+MAX_OPEN_POSITIONS = 10  # Maximum concurrent positions
+MAX_PORTFOLIO_HEAT = 0.40  # Max 40% total capital at risk
+
+# ATR-based risk
+STOP_LOSS_ATR_MULTIPLIER = 2.0  # Already defined above
+TAKE_PROFIT_ATR_MULTIPLIER = 3.0  # Already defined above
+
+# Risk/Reward
+MIN_RISK_REWARD_RATIO = 1.5  # Minimum 1.5:1 reward/risk ratio
+
+# ═══════════════════════════════════════════════════════════════
+# POSITION SIZING CONSTANTS
+# ═══════════════════════════════════════════════════════════════
+
+POSITION_RISK_PCT = 0.02  # Already added
+MAX_POSITION_SIZE_PCT = 0.10  # Already added
+MIN_POSITION_SIZE_PCT = 0.01  # Already added
+MAX_OPEN_POSITIONS = 10  # Already added
+MAX_PORTFOLIO_HEAT = 0.40  # Already added
+MIN_RISK_REWARD_RATIO = 1.5  # Already added
+
+# Minimum values
+MIN_POSITION_VALUE = 5000  # Min position value in base currency
+MIN_TRADE_VALUE = 5000  # Min trade value
+MAX_POSITION_VALUE = 100000  # Max position value per trade
+
+# Sector concentration
+MAX_SECTOR_CONCENTRATION = 0.30
+MAX_SECTOR_CONCENTRATION_PCT = 30.0
+
+# Portfolio limits
+MAX_DAILY_LOSS_PCT = 0.05
+MAX_DRAWDOWN_PCT = 0.15
+MAX_LEVERAGE = 1.0  # No leverage for conservative trading
+# ═══════════════════════════════════════════════════════════════
+# TIMEZONES
+# ═══════════════════════════════════════════════════════════════
+
+TZ_INDIA = pytz.timezone("Asia/Kolkata")    # IST (UTC+5:30)
+TZ_US_EAST = pytz.timezone("US/Eastern")    # EST/EDT (UTC-5 or UTC-4)
+TZ_UTC = pytz.utc
+
+# ═══════════════════════════════════════════════════════════════
+# COMPLETE RISK MANAGEMENT CONSTANTS
+# ═══════════════════════════════════════════════════════════════
+
+POSITION_RISK_PCT = 0.02
+MAX_POSITION_SIZE_PCT = 0.10
+MIN_POSITION_SIZE_PCT = 0.01
+MAX_OPEN_POSITIONS = 10
+MAX_PORTFOLIO_HEAT = 0.40
+MIN_RISK_REWARD_RATIO = 1.5
+STOP_LOSS_ATR_MULTIPLIER = 2.0
+TAKE_PROFIT_ATR_MULTIPLIER = 3.0
+MAX_SECTOR_CONCENTRATION = 0.30
+MAX_DAILY_LOSS_PCT = 0.05
+MAX_DRAWDOWN_PCT = 0.15
+# ═══════════════════════════════════════════════════════════════
+# MARKET TRADING HOURS
+# ═══════════════════════════════════════════════════════════════
+
+class MarketHours:
+    """Defines when a market is open for trading."""
+
+    def __init__(
+        self,
+        name: str,
+        timezone: pytz.BaseTzInfo,
+        open_time: time,
+        close_time: time,
+        pre_open_time: time,   # Data warmup start (before actual trading)
+        pre_close_time: time,  # Last safe time to open new positions
+    ):
+        self.name = name
+        self.timezone = timezone
+        self.open_time = open_time
+        self.close_time = close_time
+        self.pre_open_time = pre_open_time
+        self.pre_close_time = pre_close_time
+
+
+# NSE (National Stock Exchange, India)
+# Regular session: 9:15 AM – 3:30 PM IST, Monday–Friday
+NSE_HOURS = MarketHours(
+    name="NSE",
+    timezone=TZ_INDIA,
+    open_time=time(9, 15),
+    close_time=time(15, 30),
+    pre_open_time=time(8, 45),   # Data warmup at 8:45 AM IST
+    pre_close_time=time(15, 0),  # No new positions after 3:00 PM IST
+)
+
+# NYSE / NASDAQ (United States)
+# Regular session: 9:30 AM – 4:00 PM ET, Monday–Friday
+NYSE_HOURS = MarketHours(
+    name="NYSE",
+    timezone=TZ_US_EAST,
+    open_time=time(9, 30),
+    close_time=time(16, 0),
+    pre_open_time=time(9, 0),    # Data warmup at 9:00 AM ET
+    pre_close_time=time(15, 30), # No new positions after 3:30 PM ET
+)
+
+
+# ═══════════════════════════════════════════════════════════════
+# MARKET HOLIDAYS
+# ═══════════════════════════════════════════════════════════════
+# Markets are CLOSED on these dates. The system will not place
+# any trades on these days.
+# Source: NSE official calendar + NYSE official calendar
+
+NSE_HOLIDAYS_2025: Set[date] = {
+    date(2025, 1, 26),   # Republic Day
+    date(2025, 2, 26),   # Mahashivratri
+    date(2025, 3, 14),   # Holi
+    date(2025, 3, 31),   # Id-Ul-Fitr (Ramzan Eid) - tentative
+    date(2025, 4, 10),   # Ram Navami
+    date(2025, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
+    date(2025, 4, 18),   # Good Friday
+    date(2025, 5, 1),    # Maharashtra Day
+    date(2025, 8, 15),   # Independence Day
+    date(2025, 8, 27),   # Ganesh Chaturthi
+    date(2025, 10, 2),   # Mahatma Gandhi Jayanti / Dussehra
+    date(2025, 10, 20),  # Diwali Laxmi Pujan (tentative)
+    date(2025, 10, 21),  # Diwali Balipratipada (tentative)
+    date(2025, 11, 5),   # Prakash Gurpurb Sri Guru Nanak Dev Ji
+    date(2025, 12, 25),  # Christmas
+}
+
+NSE_HOLIDAYS_2026: Set[date] = {
+    date(2026, 1, 26),   # Republic Day
+    date(2026, 3, 3),    # Holi (tentative)
+    date(2026, 3, 20),   # Mahashivratri (tentative)
+    date(2026, 4, 3),    # Good Friday
+    date(2026, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
+    date(2026, 5, 1),    # Maharashtra Day
+    date(2026, 8, 15),   # Independence Day
+    date(2026, 10, 2),   # Mahatma Gandhi Jayanti
+    date(2026, 12, 25),  # Christmas
+}
+
+NSE_HOLIDAYS: Set[date] = NSE_HOLIDAYS_2025 | NSE_HOLIDAYS_2026
+
+NYSE_HOLIDAYS_2025: Set[date] = {
+    date(2025, 1, 1),    # New Year's Day
+    date(2025, 1, 20),   # Martin Luther King Jr. Day
+    date(2025, 2, 17),   # Presidents' Day
+    date(2025, 4, 18),   # Good Friday
+    date(2025, 5, 26),   # Memorial Day
+    date(2025, 6, 19),   # Juneteenth
+    date(2025, 7, 4),    # Independence Day
+    date(2025, 9, 1),    # Labor Day
+    date(2025, 11, 27),  # Thanksgiving Day
+    date(2025, 12, 25),  # Christmas Day
+}
+
+NYSE_HOLIDAYS_2026: Set[date] = {
+    date(2026, 1, 1),    # New Year's Day
+    date(2026, 1, 19),   # Martin Luther King Jr. Day
+    date(2026, 2, 16),   # Presidents' Day
+    date(2026, 4, 3),    # Good Friday
+    date(2026, 5, 25),   # Memorial Day
+    date(2026, 6, 19),   # Juneteenth
+    date(2026, 7, 3),    # Independence Day (observed, July 4 is Saturday)
+    date(2026, 9, 7),    # Labor Day
+    date(2026, 11, 26),  # Thanksgiving Day
+    date(2026, 12, 25),  # Christmas Day
+}
+
+NYSE_HOLIDAYS: Set[date] = NYSE_HOLIDAYS_2025 | NYSE_HOLIDAYS_2026
+
+
+# ═══════════════════════════════════════════════════════════════
+# DEFAULT STOCK WATCHLISTS
+# ═══════════════════════════════════════════════════════════════
+# These are the default stocks the system monitors.
+# You can override these in .env using INDIA_WATCHLIST_OVERRIDE
+# or US_WATCHLIST_OVERRIDE.
+#
+# NSE symbols use the ".NS" suffix for yfinance compatibility.
+# BSE symbols would use ".BO" — but NSE is preferred for liquidity.
+
+DEFAULT_INDIA_WATCHLIST: List[str] = [
+    "RELIANCE.NS",    # Reliance Industries — energy, retail, telecom conglomerate
+    "TCS.NS",         # Tata Consultancy Services — IT services
+    "HDFCBANK.NS",    # HDFC Bank — largest private bank by assets
+    "INFY.NS",        # Infosys — IT services and consulting
+    "ICICIBANK.NS",   # ICICI Bank — private sector bank
+    "WIPRO.NS",       # Wipro — IT services
+    "AXISBANK.NS",    # Axis Bank — private sector bank
+    "KOTAKBANK.NS",   # Kotak Mahindra Bank — private sector bank
+    "LT.NS",          # Larsen & Toubro — engineering and construction
+    "BAJFINANCE.NS",  # Bajaj Finance — NBFC, consumer lending
+    "SBIN.NS",        # State Bank of India — largest public sector bank
+    "ASIANPAINT.NS",  # Asian Paints — decorative paints market leader
+    "TITAN.NS",       # Titan Company — watches, jewelry (Tanishq)
+    "NESTLEIND.NS",   # Nestle India — FMCG food products
+    "DMART.NS",       # Avenue Supermarts (D-Mart) — retail supermarkets
+    "ULTRACEMCO.NS",  # UltraTech Cement — largest cement company in India
+    "SUNPHARMA.NS",   # Sun Pharmaceutical — largest pharma company
+    "MARUTI.NS",      # Maruti Suzuki — largest passenger car manufacturer
+    "TECHM.NS",       # Tech Mahindra — IT services
+    "HINDUNILVR.NS",  # Hindustan Unilever — FMCG consumer goods
+]
+
+# Company names for news search (must match watchlist order)
+DEFAULT_INDIA_COMPANY_NAMES: Dict[str, str] = {
+    "RELIANCE.NS": "Reliance Industries",
+    "TCS.NS": "Tata Consultancy Services TCS",
+    "HDFCBANK.NS": "HDFC Bank",
+    "INFY.NS": "Infosys",
+    "ICICIBANK.NS": "ICICI Bank",
+    "WIPRO.NS": "Wipro",
+    "AXISBANK.NS": "Axis Bank",
+    "KOTAKBANK.NS": "Kotak Mahindra Bank",
+    "LT.NS": "Larsen Toubro L&T",
+    "BAJFINANCE.NS": "Bajaj Finance",
+    "SBIN.NS": "State Bank of India SBI",
+    "ASIANPAINT.NS": "Asian Paints",
+    "TITAN.NS": "Titan Company",
+    "NESTLEIND.NS": "Nestle India",
+    "DMART.NS": "DMart Avenue Supermarts",
+    "ULTRACEMCO.NS": "UltraTech Cement",
+    "SUNPHARMA.NS": "Sun Pharmaceutical",
+    "MARUTI.NS": "Maruti Suzuki",
+    "TECHM.NS": "Tech Mahindra",
+    "HINDUNILVR.NS": "Hindustan Unilever HUL",
+}
+
+DEFAULT_US_WATCHLIST: List[str] = [
+    "AAPL",    # Apple Inc.
+    "MSFT",    # Microsoft Corporation
+    "GOOGL",   # Alphabet Inc. (Google)
+    "AMZN",    # Amazon.com Inc.
+    "NVDA",    # NVIDIA Corporation
+    "META",    # Meta Platforms (Facebook)
+    "TSLA",    # Tesla Inc.
+    "BRK-B",   # Berkshire Hathaway Class B
+    "JPM",     # JPMorgan Chase & Co.
+    "JNJ",     # Johnson & Johnson
+    "V",       # Visa Inc.
+    "PG",      # Procter & Gamble
+    "UNH",     # UnitedHealth Group
+    "HD",      # The Home Depot
+    "MA",      # Mastercard Incorporated
+    "DIS",     # The Walt Disney Company
+    "PYPL",    # PayPal Holdings
+    "NFLX",    # Netflix Inc.
+    "ADBE",    # Adobe Inc.
+    "CRM",     # Salesforce Inc.
+]
+
+DEFAULT_US_COMPANY_NAMES: Dict[str, str] = {
+    "AAPL": "Apple", "MSFT": "Microsoft", "GOOGL": "Google Alphabet",
+    "AMZN": "Amazon", "NVDA": "NVIDIA", "META": "Meta Facebook",
+    "TSLA": "Tesla", "BRK-B": "Berkshire Hathaway", "JPM": "JPMorgan Chase",
+    "JNJ": "Johnson Johnson", "V": "Visa", "PG": "Procter Gamble",
+    "UNH": "UnitedHealth", "HD": "Home Depot", "MA": "Mastercard",
+    "DIS": "Disney", "PYPL": "PayPal", "NFLX": "Netflix",
+    "ADBE": "Adobe", "CRM": "Salesforce",
+}
+
+# NSE index symbols (used for macro analysis)
+NIFTY_50_SYMBOL = "^NSEI"       # Nifty 50 index
+NIFTY_BANK_SYMBOL = "^NSEBANK"  # Nifty Bank index
+SENSEX_SYMBOL = "^BSESN"        # BSE Sensex
+
+# US index symbols
+SP500_SYMBOL = "^GSPC"          # S&P 500
+VIX_SYMBOL = "^VIX"             # CBOE Volatility Index (fear gauge)
+NASDAQ_SYMBOL = "^IXIC"         # NASDAQ Composite
+DOW_SYMBOL = "^DJI"             # Dow Jones Industrial Average
+
+
+# ═══════════════════════════════════════════════════════════════
+# MARKET REGIME
+# ═══════════════════════════════════════════════════════════════
+
+class MarketRegime(str, Enum):
+    """
+    Current overall market condition.
+    Determined by MacroCollector based on VIX, moving averages, and macro data.
+    Affects position sizing — the worse the regime, the smaller the positions.
+    """
+    STRONG_BULL = "STRONG_BULL"   # Above 200MA, VIX < 15, economy growing
+    BULL = "BULL"                  # Above 200MA, VIX 15-20
+    NEUTRAL = "NEUTRAL"            # Mixed signals, VIX 20-25
+    BEAR = "BEAR"                  # Below 200MA, VIX 25-35
+    STRONG_BEAR = "STRONG_BEAR"   # Below 200MA, VIX > 35, recession signals
+
+# Position sizing multiplier per market regime
+# Final position size = base_size × regime_multiplier
+REGIME_POSITION_MULTIPLIER: Dict[str, float] = {
+    MarketRegime.STRONG_BULL: 1.0,   # Full position allowed
+    MarketRegime.BULL: 0.8,          # 80% of normal position
+    MarketRegime.NEUTRAL: 0.6,       # 60% of normal position
+    MarketRegime.BEAR: 0.4,          # 40% of normal position
+    MarketRegime.STRONG_BEAR: 0.0,   # No new positions (preserve capital)
+}
+
+# VIX thresholds for regime determination
+VIX_LOW = 15.0       # Below this = calm market
+VIX_MODERATE = 20.0  # 15-20 = slightly elevated
+VIX_HIGH = 25.0      # 20-25 = elevated uncertainty
+VIX_VERY_HIGH = 35.0 # 25-35 = fearful market
+VIX_EXTREME = 40.0   # Above 40 = circuit breaker territory (extreme fear)
+
+
+# ═══════════════════════════════════════════════════════════════
+# TECHNICAL ANALYSIS THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# RSI (Relative Strength Index) — measures momentum (0-100)
+RSI_OVERSOLD = 30     # Below this: potentially oversold, consider buying
+RSI_OVERBOUGHT = 70   # Above this: potentially overbought, consider selling
+RSI_LOWER_NEUTRAL = 45
+RSI_UPPER_NEUTRAL = 55
+
+# Bollinger Bands position (0 = at lower band, 1 = at upper band)
+BB_LOWER_ZONE = 0.20  # Price near lower band — potential bounce
+BB_UPPER_ZONE = 0.80  # Price near upper band — potential reversal
+
+# Volume surge threshold
+VOLUME_SURGE_STRONG = 2.0    # 2x average volume = strong conviction
+VOLUME_SURGE_MODERATE = 1.5  # 1.5x average volume = moderate conviction
+
+# Price proximity thresholds (as % of price)
+PRICE_AT_LEVEL_THRESHOLD = 0.02   # Within 2% = "at" a support/resistance level
+NEAR_SUPPORT_THRESHOLD = 0.02     # Within 2% of support
+NEAR_RESISTANCE_THRESHOLD = 0.02  # Within 2% of resistance
+
+# SMA proximity
+SMA200_AT_THRESHOLD = 0.02  # Within 2% of SMA200 = "at key level"
+
+# ATR multipliers for stop loss and take profit
+STOP_LOSS_ATR_MULTIPLE = 2.0    # Stop loss = entry - (2 × ATR)
+TAKE_PROFIT_ATR_MULTIPLE = 3.0  # Take profit = entry + (3 × ATR) → 1:1.5 R/R
+
+
+# ═══════════════════════════════════════════════════════════════
+# FUNDAMENTAL ANALYSIS THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# Scoring criteria — each criterion adds 2 points to fundamental_score (max 10)
+FUNDAMENTAL_PE_MAX = 25.0              # PE ratio below this = reasonably valued
+FUNDAMENTAL_DEBT_EQUITY_MAX = 1.0     # Debt/Equity below this = conservatively financed
+FUNDAMENTAL_REVENUE_GROWTH_MIN = 10.0 # YoY revenue growth above this = healthy growth (%)
+FUNDAMENTAL_PROFIT_MARGIN_MIN = 15.0  # Net profit margin above this = efficient (%)
+FUNDAMENTAL_ROE_MIN = 15.0            # Return on Equity above this = good capital use (%)
+FUNDAMENTAL_MIN_METRICS = 3           # Minimum number of metrics needed for a valid score
+
+
+# ═══════════════════════════════════════════════════════════════
+# DATA VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# Price data freshness — how old can data be before it's considered stale?
+PRICE_MAX_AGE_MINUTES = 15        # During market hours
+PRICE_MAX_AGE_EOD_MINUTES = 60    # At market close / pre-market
+
+# Suspicious price change threshold
+PRICE_SPIKE_THRESHOLD = 0.20      # >20% intraday move is suspicious (may be bad data)
+
+# Minimum trading volume for a stock to be liquid enough to trade
+MIN_DAILY_VOLUME = 100_000        # 1 lakh shares/day minimum for India
+MIN_DAILY_VOLUME_US = 500_000     # 5 lakh shares/day for US stocks
+
+# Historical data requirements
+MIN_TRADING_DAYS_HISTORY = 252    # 1 year of data required for ML models
+MAX_CONSECUTIVE_MISSING_DAYS = 5  # More than 5 missing days in a row = data problem
+
+# News data
+MIN_NEWS_ARTICLES = 1             # Warn if fewer than this in last 48 hours
+MIN_NEWS_ARTICLES_FOR_SENTIMENT = 3  # Need at least 3 articles for reliable sentiment
+
+
+# ═══════════════════════════════════════════════════════════════
+# EARNINGS RISK LEVELS
+# ═══════════════════════════════════════════════════════════════
+
+class EarningsRiskLevel(str, Enum):
+    """
+    Risk level based on proximity to an earnings announcement.
+    Stocks become very unpredictable around earnings — reduce or block trades.
+    """
+    NONE = "NONE"       # No earnings in 7+ days — trade normally
+    LOW = "LOW"         # 3-7 days — trade with reduced position (70% normal)
+    HIGH = "HIGH"       # 1-3 days (72 hrs) — trade with half position (50% normal)
+    BLOCK = "BLOCK"     # Within 24 hours — DO NOT trade this stock
+
+EARNINGS_BLOCK_HOURS = 24    # Block trades if earnings within 24 hours
+EARNINGS_HIGH_RISK_HOURS = 72   # High risk if earnings within 72 hours
+EARNINGS_LOW_RISK_DAYS = 7      # Low risk if earnings within 7 days
+
+
+# ═══════════════════════════════════════════════════════════════
+# CIRCUIT BREAKER THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+CIRCUIT_BREAKER_CONSECUTIVE_LOSSES = 5      # 5 losses in a row → halt
+CIRCUIT_BREAKER_RUNAWAY_ORDERS = 20         # 20+ orders in 10 minutes → halt
+CIRCUIT_BREAKER_DATA_FEED_TIMEOUT_MINS = 30 # No price data for 30 mins → halt
+CIRCUIT_BREAKER_BROKER_TIMEOUT_MINS = 15    # No broker response for 15 mins → halt
+CIRCUIT_BREAKER_VIX_THRESHOLD = 40.0        # VIX above 40 → halt
+
+
+# ═══════════════════════════════════════════════════════════════
+# ML MODEL THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# Ensemble prediction thresholds
+ENSEMBLE_BUY_THRESHOLD = 0.65   # composite_score > this → BUY signal
+ENSEMBLE_SELL_THRESHOLD = 0.35  # composite_score < this → SELL signal
+ENSEMBLE_DISAGREEMENT_THRESHOLD = 0.40  # If LSTM and XGBoost differ by >40% → HOLD
+
+# XGBoost training targets
+XGBOOST_BUY_RETURN_THRESHOLD = 0.03    # 5-day return > 3% → label as BUY
+XGBOOST_SELL_RETURN_THRESHOLD = -0.03  # 5-day return < -3% → label as SELL
+# XGBoost training parameters
+XGBOOST_TARGET_RETURN_PCT = 0.01  # 1% return threshold for binary classification
+# Minimum acceptable backtest results before deployment warning
+BACKTEST_MIN_SHARPE = 1.0
+BACKTEST_MAX_DRAWDOWN = 25.0   # Max 25% drawdown in backtest
+BACKTEST_MIN_WIN_RATE = 0.50   # At least 50% winning trades
+BACKTEST_MIN_PROFIT_FACTOR = 1.2  # Total wins / Total losses > 1.2
+
+# LSTM architecture
+LSTM_SEQUENCE_LENGTH = 60       # Days of history fed into LSTM
+LSTM_FEATURE_COUNT = 6          # Features per timestep: Close, Volume, RSI, MACD, BB_pos, ATR
+LSTM_LAYER_1_UNITS = 128
+LSTM_LAYER_2_UNITS = 64
+LSTM_DENSE_UNITS = 32
+LSTM_DROPOUT_RATE = 0.2
+LSTM_OUTPUT_CLASSES = 3         # [1day_prob, 3day_prob, 7day_prob]
+LSTM_BATCH_SIZE = 32
+LSTM_MAX_EPOCHS = 100
+LSTM_EARLY_STOPPING_PATIENCE = 10
+LSTM_VALIDATION_SPLIT = 0.2
+
+# XGBoost Model Parameters
+XGBOOST_TARGET_RETURN_PCT = 0.01  # Already added
+XGBOOST_TARGET_DAYS = 5  # Predict 5-day forward return
+XGBOOST_MAX_DEPTH = 6
+XGBOOST_LEARNING_RATE = 0.1
+XGBOOST_N_ESTIMATORS = 100
+XGBOOST_MIN_CHILD_WEIGHT = 1
+XGBOOST_GAMMA = 0
+XGBOOST_SUBSAMPLE = 0.8
+XGBOOST_COLSAMPLE_BYTREE = 0.8
+
+# LSTM Model Parameters
+LSTM_SEQUENCE_LENGTH = 60
+LSTM_UNITS = 50
+LSTM_DROPOUT = 0.2
+LSTM_LEARNING_RATE = 0.001
+LSTM_BATCH_SIZE = 32
+LSTM_EPOCHS = 100
+
+# Feature Engineering
+TECHNICAL_INDICATORS_WINDOW = 14
+FUNDAMENTAL_LOOKBACK_DAYS = 252
+
+XGBOOST_RANDOM_STATE = 42
+XGBOOST_EARLY_STOPPING_ROUNDS = 10
+XGBOOST_EVAL_METRIC = 'auc'
+XGBOOST_USE_LABEL_ENCODER = False
+
+ML_MIN_TRAINING_DAYS = 252  # Need 1 year of data minimum
+# ═══════════════════════════════════════════════════════════════
+# API RATE LIMITS (Free Tier Daily Limits)
+# ═══════════════════════════════════════════════════════════════
+# The system tracks these in the database and will automatically
+# switch to fallback sources when limits are approached.
+
+API_DAILY_LIMITS: Dict[str, int] = {
+    "newsapi": 90,          # 100/day — keep 10 buffer
+    "gnews": 90,            # 100/day — keep 10 buffer
+    "alpha_vantage": 23,    # 25/day — keep 2 buffer
+    "groq": 12_000,         # 14,400/day — keep 2,400 buffer
+    "yfinance": 9_999,      # No official limit, but be conservative
+}
+
+
+# ═══════════════════════════════════════════════════════════════
+# SCHEDULER TIMING (24-hour format, local market timezone)
+# ═══════════════════════════════════════════════════════════════
+
+INDIA_TRADING_SCHEDULE = {
+    "pre_market": "08:45",        # Data warmup, model loading, circuit breaker check
+    "market_open_cycle": "09:20", # First analysis cycle (5 min after open)
+    "mid_morning_cycle": "10:30", # Second cycle
+    "midday_cycle": "12:30",      # Third cycle
+    "afternoon_cycle": "14:00",   # Fourth cycle
+    "pre_close_cycle": "15:00",   # Last cycle (final window for new positions)
+    "intraday_close": "15:15",    # Close all intraday positions by this time
+    "market_close": "15:30",      # Market closes
+    "post_market": "16:00",       # Performance report, trailing stop updates
+    "weekly_retrain": "Sunday 23:00",  # Full ML model retraining
+}
+
+US_TRADING_SCHEDULE = {
+    "pre_market": "09:00",        # ET — data warmup
+    "market_open_cycle": "09:35", # ET — first cycle
+    "mid_morning_cycle": "11:00",
+    "midday_cycle": "13:00",
+    "afternoon_cycle": "14:30",
+    "pre_close_cycle": "15:30",   # ET
+    "intraday_close": "15:45",    # ET
+    "market_close": "16:00",      # ET
+    "post_market": "16:30",
+    "weekly_retrain": "Sunday 23:00",
+}
+
+POSITION_MONITOR_INTERVAL_SECONDS = 300   # Check open positions every 5 minutes
+CIRCUIT_BREAKER_CHECK_INTERVAL_SECONDS = 60  # Check circuit breaker every 60 seconds
+DASHBOARD_UPDATE_INTERVAL_SECONDS = 30   # Push dashboard update every 30 seconds
+
+
+# ═══════════════════════════════════════════════════════════════
+# SECTOR CLASSIFICATION (NSE)
+# ═══════════════════════════════════════════════════════════════
+
+NSE_SECTOR_MAP: Dict[str, str] = {
+    "RELIANCE.NS": "Energy/Conglomerate",
+    "TCS.NS": "IT",
+    "HDFCBANK.NS": "Banking",
+    "INFY.NS": "IT",
+    "ICICIBANK.NS": "Banking",
+    "WIPRO.NS": "IT",
+    "AXISBANK.NS": "Banking",
+    "KOTAKBANK.NS": "Banking",
+    "LT.NS": "Infrastructure",
+    "BAJFINANCE.NS": "NBFC",
+    "SBIN.NS": "Banking",
+    "ASIANPAINT.NS": "Consumer",
+    "TITAN.NS": "Consumer",
+    "NESTLEIND.NS": "FMCG",
+    "DMART.NS": "Retail",
+    "ULTRACEMCO.NS": "Cement",
+    "SUNPHARMA.NS": "Pharma",
+    "MARUTI.NS": "Auto",
+    "TECHM.NS": "IT",
+    "HINDUNILVR.NS": "FMCG",
+}
+
+# Maximum % of portfolio in any single sector (concentration risk)
+MAX_SECTOR_CONCENTRATION_PERCENT = 20.0
+
+
+# ═══════════════════════════════════════════════════════════════
+# FRED (Federal Reserve) ECONOMIC DATA SERIES IDs
+# ═══════════════════════════════════════════════════════════════
+# These are used by MacroCollector to assess economic conditions.
+# All are free to access via the FRED API (no key required).
+
+FRED_SERIES: Dict[str, str] = {
+    "federal_funds_rate": "FEDFUNDS",          # US interest rate target
+    "gdp_growth": "A191RL1Q225SBEA",           # US real GDP growth rate (%)
+    "unemployment": "UNRATE",                   # US unemployment rate (%)
+    "cpi_inflation": "CPIAUCSL",               # US consumer price index
+    "treasury_10y": "DGS10",                   # 10-year Treasury yield (%)
+    "treasury_2y": "DGS2",                     # 2-year Treasury yield (%)
+    "yield_curve": "T10Y2Y",                   # 10Y minus 2Y spread (recession signal)
+    "consumer_sentiment": "UMCSENT",            # University of Michigan consumer sentiment
+    "industrial_production": "INDPRO",          # US industrial production index
+}
+
+
+# ═══════════════════════════════════════════════════════════════
+# MISC
+# ═══════════════════════════════════════════════════════════════
+
+# Minimum trade amount (to avoid tiny fractional trades)
+MIN_TRADE_VALUE_INR = 5_000     # ₹5,000 minimum trade size
+MIN_TRADE_VALUE_USD = 100       # $100 minimum trade size
+
+# Historical data period for ML training
+ML_TRAINING_PERIOD = "5y"       # 5 years of historical data
+ML_INFERENCE_PERIOD = "3mo"     # 3 months for recent inference features
+
+# Agent timeout settings (seconds)
+AGENT_TIMEOUT_SECONDS: Dict[str, int] = {
+    "PriceAgent": 30,
+    "NewsAgent": 45,
+    "MacroAgent": 60,
+    "EarningsAgent": 45,
+    "TechnicalAgent": 30,
+    "FundamentalAgent": 30,
+    "SentimentAgent": 120,       # Longer due to multiple Groq API calls
+    "MLPredictionAgent": 60,
+    "EventRiskAgent": 30,
+    "PositionSizingAgent": 15,
+    "PortfolioRiskAgent": 15,
+    "DecisionAgent": 60,
+    "ExecutionAgent": 30,
+}
+
+# Database connection pool settings
+DB_POOL_SIZE = 5
+DB_MAX_OVERFLOW = 10
+DB_POOL_TIMEOUT = 30
+
+# Logging format
+LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+# ========================================
+# ENSEMBLE MODEL PARAMETERS
+# ========================================
+ENSEMBLE_LSTM_WEIGHT = 0.5  # Weight for LSTM predictions (50%)
+ENSEMBLE_XGBOOST_WEIGHT = 0.5  # Weight for XGBoost predictions (50%)
+ENSEMBLE_MIN_AGREEMENT = 0.6  # Models must agree within 60% to avoid HOLD
+ENSEMBLE_BUY_THRESHOLD = 0.65  # Already exists above, but keep for ensemble
+ENSEMBLE_SELL_THRESHOLD = 0.35  # Already exists above
+
+# ========================================
+# ENSEMBLE MODEL PARAMETERS
+# ========================================
+ENSEMBLE_LSTM_WEIGHT = 0.5
+ENSEMBLE_XGBOOST_WEIGHT = 0.5
+ENSEMBLE_MIN_AGREEMENT = 0.6
+ENSEMBLE_MIN_DISAGREEMENT = 0.3
+ENSEMBLE_BUY_THRESHOLD = 0.65
+ENSEMBLE_SELL_THRESHOLD = 0.35
+ENSEMBLE_CONFIDENCE_THRESHOLD = 0.6

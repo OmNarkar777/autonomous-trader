@@ -1,0 +1,21 @@
+﻿# Free API keys to register for:
+
+1. News API (Free tier: 100 requests/day)
+   https://newsapi.org/register
+   Add to .env: NEWS_API_KEY=your_key
+
+2. Alpha Vantage (Free: 25 requests/day for fundamentals)
+   https://www.alphavantage.co/support/#api-key
+   Add to .env: ALPHA_VANTAGE_KEY=your_key
+
+3. FRED API (Free: unlimited for macro data)
+   https://fred.stlouisfed.org/docs/api/api_key.html
+   Add to .env: FRED_API_KEY=your_key
+
+4. Yahoo Finance (Free: unlimited via yfinance library)
+   Already using ✅
+
+5. FinBERT Sentiment (Free: run locally)
+   Already can use ✅
+
+ALL FREE FOREVER - NO COSTS
